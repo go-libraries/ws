@@ -124,6 +124,10 @@ func (w *Protocol) registerWs(rw http.ResponseWriter, r *http.Request, room stri
         send: make(chan []byte, 256),
         room:room,
         CLog:w.PLog,
+
+        maxMessageSize:w.Config.GetMaxMessageSize(),
+        pongWait:w.Config.GetPongWaitTime(),
+        writeWait:w.Config.GetWriteWaitTime(),
     }
 
     Wsp.Online(wsConn)

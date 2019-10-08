@@ -15,6 +15,11 @@ type Connection struct {
     room string
     close bool
     CLog ILog
+    Config IConfig
+
+    maxMessageSize int64
+    pongWait       time.Duration
+    writeWait      time.Duration
 }
 
 func (wsc *Connection) GetUniqueKey() string {
@@ -39,9 +44,9 @@ func (wsc *Connection) read() {
     defer func() {
         wsc.Close()
     }()
-    wsc.SetReadLimit(maxMessageSize)
-    wsc.SetReadDeadline(time.Now().Add(pongWait))
-    wsc.SetPongHandler(func(string) error { wsc.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+    wsc.SetReadLimit(wsc.maxMessageSize)
+    wsc.SetReadDeadline(time.Now().Add(wsc.pongWait))
+    wsc.SetPongHandler(func(string) error { wsc.SetReadDeadline(time.Now().Add(wsc.pongWait)); return nil })
     for {
         msgType, message, err := wsc.ReadMessage()
         if err != nil {
@@ -80,7 +85,7 @@ func (wsc *Connection) Close() {
 }
 
 func (wsc *Connection) write() {
-    ticker := time.NewTicker(pingPeriod)
+    ticker := time.NewTicker(getPingPeriod(wsc.pongWait))
     defer func() {
         ticker.Stop()
         wsc.Close()
@@ -88,7 +93,7 @@ func (wsc *Connection) write() {
     for {
         select {
         case message, ok := <- wsc.send:
-            wsc.SetWriteDeadline(time.Now().Add(writeWait))
+            wsc.SetWriteDeadline(time.Now().Add(wsc.writeWait))
             //fmt.Println(message)
             if !ok {
                 // The hub closed the channel.
@@ -102,7 +107,7 @@ func (wsc *Connection) write() {
             }
             //心跳
         case <-ticker.C:
-            wsc.SetWriteDeadline(time.Now().Add(writeWait))
+            wsc.SetWriteDeadline(time.Now().Add(wsc.writeWait))
             if err := wsc.WriteMessage(websocket.PingMessage, nil); err != nil {
                 return
             }
@@ -115,7 +120,7 @@ func (wsc *Connection) WriteString(message string) {
 }
 
 func (wsc *Connection) WriteBytes(message []byte) error {
-    wsc.SetWriteDeadline(time.Now().Add(writeWait))
+    wsc.SetWriteDeadline(time.Now().Add(wsc.writeWait))
 
     w, err := wsc.NextWriter(websocket.TextMessage)
     if err != nil {

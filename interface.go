@@ -15,7 +15,7 @@ type IConfig interface {
     GetWriteWaitTime() (d time.Duration)
     GetReadWaitTime() (d time.Duration)
     GetConnectionWaitTime() (d time.Duration)
-    GetMaxMessageSize() uint64
+    GetMaxMessageSize() int64
     GetPongWaitTime() (d time.Duration)
     GetReadBufferSize() int
     GetWriteBufferSize() int
