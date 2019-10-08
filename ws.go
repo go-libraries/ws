@@ -5,6 +5,7 @@ import (
     "sync"
     //"github.com/lwl1989/ws/message"
     "strings"
+    "github.com/gorilla/websocket"
 )
 
 
@@ -24,7 +25,13 @@ type Protocol struct {
 
     Msg chan IMessage
     num int //count
+
     PLog ILog
+
+    CheckOrigin func(r *http.Request) bool
+    UpErrorHandler func(res http.ResponseWriter, r *http.Request, status int, reason error)
+
+    Config IConfig
 }
 
 var m sync.Map
@@ -49,6 +56,7 @@ func (w *Protocol) ServeHTTP(rw http.ResponseWriter, r *http.Request)  {
         rw.Write([]byte("{}"))
         return
     }
+
 
     if res[0] == "ws" {
         w.registerWs(rw, r, room)
@@ -77,17 +85,37 @@ func (w *Protocol)  registerRoom(rw http.ResponseWriter, r *http.Request, room s
     }
 }
 
-func (w *Protocol)  registerWs(rw http.ResponseWriter, r *http.Request, room string)  {
+func (w *Protocol) registerWs(rw http.ResponseWriter, r *http.Request, room string)  {
 
     uniqueKey := r.Header.Get("Sec-WebSocket-Key")
     if uniqueKey == "" {
         //todo:
     }
 
-    con, err := Up.Upgrade(rw, r, nil)
+    up := &websocket.Upgrader{
+        ReadBufferSize:w.Config.GetReadBufferSize(),
+        WriteBufferSize:w.Config.GetWriteBufferSize(),
+    }
+
+    if w.UpErrorHandler != nil{
+        up.Error = w.UpErrorHandler
+    }else{
+        up.Error = w.upErrorHandler
+    }
+
+    if w.CheckOrigin != nil {
+        up.CheckOrigin = w.CheckOrigin
+    }else{
+        up.CheckOrigin = w.checkAllowOrigin
+    }
+
+    con, err := up.Upgrade(rw, r, rw.Header())
     if err != nil {
         w.PLog.Println("handler err with message" + err.Error())
-        panic("handler err with message" + err.Error())
+        rw.Write([]byte("fail to upGrader"))
+        rw.WriteHeader(500)
+        return
+        //panic("handler err with message" + err.Error())
     }
 
     var wsConn  = &Connection {
@@ -95,6 +123,7 @@ func (w *Protocol)  registerWs(rw http.ResponseWriter, r *http.Request, room str
         Conn:con,
         send: make(chan []byte, 256),
         room:room,
+        CLog:w.PLog,
     }
 
     Wsp.Online(wsConn)
@@ -160,4 +189,15 @@ func (w *Protocol) Run()  {
             w.send(msg)
         }
     }
+}
+
+func (w *Protocol) upErrorHandler(res http.ResponseWriter, req *http.Request, status int, reason error) {
+    w.PLog.Println("handler err with message" + reason.Error())
+    res.Write([]byte("fail to upGrader"))
+    res.WriteHeader(status)
+}
+
+
+func (w *Protocol) checkAllowOrigin(r *http.Request) bool {
+        return true
 }
