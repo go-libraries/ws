@@ -3,7 +3,6 @@ package ws
 import (
     "net/http"
     "sync"
-    //"github.com/lwl1989/ws/message"
     "strings"
     "github.com/gorilla/websocket"
 )
@@ -17,24 +16,27 @@ type Protocol struct {
     unRegister chan *Connection
 
     //all connections, It's mapping O(1)
-    //Connections map[string]*Connection
     ConnectionsMap  map[string]*sync.Map
 
     //use rw mutex
     rwm *sync.RWMutex
 
+    //send and received message
     Msg chan IMessage
     num int //count
 
+    //log
     PLog ILog
 
+    //upgrade check logic
     CheckOrigin func(r *http.Request) bool
+    //upgrade error handler
     UpErrorHandler func(res http.ResponseWriter, r *http.Request, status int, reason error)
 
+    //config
     Config IConfig
 }
 
-var m sync.Map
 
 func (w *Protocol) ServeHTTP(rw http.ResponseWriter, r *http.Request)  {
 
@@ -149,6 +151,7 @@ func (w *Protocol) registerWs(rw http.ResponseWriter, r *http.Request, room stri
     go wsConn.write()
 }
 
+//send message with msg
 func (w *Protocol) send(msg IMessage) {
     all := w.All(msg.GetRoom())
     bs,length,err := msg.GetMessage()
@@ -157,10 +160,12 @@ func (w *Protocol) send(msg IMessage) {
         w.PLog.Println(err)
         return
     }
+
     if length < 1 || len(bs) == 0 {
         w.PLog.Println("message is nil")
         return
     }
+
     for _,v := range all{
         v.Send(bs)
     }
@@ -172,14 +177,17 @@ func (w *Protocol) Online(conn *Connection) {
 }
 
 //read lock
-func (w *Protocol) All(room string) map[string]*Connection {
-    seen := make(map[string]*Connection, w.num)
+func (w *Protocol) All(room string) []*Connection {
+    seen := make([]*Connection, 0)
 
-    m.Range(func(ki, vi interface{}) bool {
-        k, v := ki.(string), vi.(*Connection)
-        seen[k] = v
-        return true
-    })
+    if w.roomExists(room) {
+        m := w.ConnectionsMap[room]
+        m.Range(func(ki, vi interface{}) bool {
+            v := vi.(*Connection)
+            seen = append(seen, v)
+            return true
+        })
+    }
 
     return seen
 }
@@ -189,6 +197,9 @@ func (w *Protocol) OffLine(conn *Connection) {
     w.unRegister <- conn
 }
 
+//run
+// 1 catch client in/out
+// 2 catch message
 func (w *Protocol) Run()  {
     for {
         select {
