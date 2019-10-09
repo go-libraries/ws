@@ -41,8 +41,10 @@ func (w *Protocol) ServeHTTP(rw http.ResponseWriter, r *http.Request)  {
     res := strings.Split(r.URL.Path, "/")
     l := len(res)
     if l < 2 || res[0] != "ws" {
-        rw.WriteHeader(200)
-        rw.Write([]byte("{}"))
+        Response(rw, DefaultResponse{
+            Code:"500",
+            Msg:"protocol not support",
+        })
         return
     }
 
@@ -52,37 +54,48 @@ func (w *Protocol) ServeHTTP(rw http.ResponseWriter, r *http.Request)  {
     }
 
     if room == "" {
-        rw.WriteHeader(200)
-        rw.Write([]byte("{}"))
+        Response(rw, DefaultResponse{
+            Code:"500",
+            Msg:"room id not exists",
+        })
         return
     }
+
 
 
     if res[0] == "ws" {
+        if !w.roomExists(room) {
+            Response(rw, DefaultResponse{
+                Code:"500",
+                Msg:"room id not exists",
+            })
+        }
         w.registerWs(rw, r, room)
-        return
     }
 
     if res[0] == "room" {
-        w.registerRoom(rw, r, room)
-        return
+        w.registerRoom(room)
     }
 
-    rw.WriteHeader(200)
-    rw.Write([]byte("{}"))
+    Response(rw, SuccessResponse)
     return
 }
 
-//lock room
-func (w *Protocol)  registerRoom(rw http.ResponseWriter, r *http.Request, room string) {
-    w.rwm.Lock()
-    defer func() {
-        w.rwm.Unlock()
-    }()
 
-    if _,ok := w.ConnectionsMap[room]; !ok {
+//lock room
+func (w *Protocol)  registerRoom(room string) {
+    w.rwm.Lock()
+    defer w.rwm.Unlock()
+
+    if ok:=w.roomExists(room); !ok {
         w.ConnectionsMap[room] = new(sync.Map)
     }
+}
+
+func (w *Protocol) roomExists(room string) bool{
+    _,ok := w.ConnectionsMap[room]
+
+    return ok
 }
 
 func (w *Protocol) registerWs(rw http.ResponseWriter, r *http.Request, room string)  {

@@ -11,6 +11,17 @@ type ILog interface {
     Println(v... interface{})
 }
 
+type IError interface {
+    Error() string
+    ToJsonBytes() []byte
+    GetCode() int
+}
+
+type IResponse interface {
+    IError
+    GetData() interface{}
+}
+
 type IConfig interface {
     GetWriteWaitTime() (d time.Duration)
     GetReadWaitTime() (d time.Duration)

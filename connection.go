@@ -10,6 +10,7 @@ import (
 
 type Connection struct {
     *websocket.Conn
+
     UniqueKey string
     send chan []byte
     room string
@@ -115,8 +116,8 @@ func (wsc *Connection) write() {
     }
 }
 
-func (wsc *Connection) WriteString(message string) {
-    wsc.WriteBytes([]byte(message))
+func (wsc *Connection) WriteString(message string) error {
+    return wsc.WriteBytes([]byte(message))
 }
 
 func (wsc *Connection) WriteBytes(message []byte) error {

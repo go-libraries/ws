@@ -4,7 +4,14 @@ import (
     "sync"
 )
 var Wsp *Protocol
-
+var SuccessResponse  = DefaultResponse{
+    Code:"200",
+    Msg:"操作成功",
+}
+var ErrorResponse = DefaultResponse{
+    Code:"200",
+    Msg:"操作失败",
+}
 func init()  {
     Wsp = &Protocol{
 
