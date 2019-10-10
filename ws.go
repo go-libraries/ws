@@ -23,7 +23,7 @@ type Protocol struct {
 
     //send and received message
     Msg chan IMessage
-    num int //count
+    num uint64 //count
 
     //log
     PLog ILog
@@ -37,12 +37,14 @@ type Protocol struct {
     Config IConfig
 }
 
-
+//router upgrade /ws/{room}
+//router http   /room/xxx/cancel
+//router http   /room/xxx/register
 func (w *Protocol) ServeHTTP(rw http.ResponseWriter, r *http.Request)  {
 
     res := strings.Split(r.URL.Path, "/")
     l := len(res)
-    if l < 2 || res[0] != "ws" {
+    if l < 2 {
         Response(rw, DefaultResponse{
             Code:"500",
             Msg:"protocol not support",
@@ -51,39 +53,68 @@ func (w *Protocol) ServeHTTP(rw http.ResponseWriter, r *http.Request)  {
     }
 
     room := ""
-    if len(res) == 2 {
-        room = res[1]
-    }
-
-    if room == "" {
-        Response(rw, DefaultResponse{
-            Code:"500",
-            Msg:"room id not exists",
-        })
-        return
-    }
-
-
-
     if res[0] == "ws" {
+        if l == 2 {
+            room = res[1]
+        }
         if !w.roomExists(room) {
             Response(rw, DefaultResponse{
                 Code:"500",
                 Msg:"room id not exists",
             })
+            return
         }
         w.registerWs(rw, r, room)
+        Response(rw, SuccessResponse)
+        return
     }
 
     if res[0] == "room" {
-        w.registerRoom(room)
+        room = res[1]
+        if room == "" {
+            Response(rw, DefaultResponse{
+                Code:"500",
+                Msg:"room id not exists",
+            })
+            return
+        }
+        isRegister := true
+        if l > 2 {
+            v := res[2]
+            if v == "cancel" {
+                isRegister = false
+            }
+        }
+        if isRegister {
+            w.registerRoom(room)
+        }else{
+            w.unRegisterRoom(room)
+        }
+        Response(rw, SuccessResponse)
+        return
     }
 
-    Response(rw, SuccessResponse)
+    Response(rw, DefaultResponse{
+        Code:"500",
+        Msg:"not support this router",
+    })
     return
 }
 
+func (w *Protocol) unRegisterRoom(room string) {
+    w.rwm.Lock()
+    defer w.rwm.Unlock()
 
+    if ok:=w.roomExists(room); ok {
+        m := w.ConnectionsMap[room]
+        m.Range(func(key, value interface{}) bool {
+            v1 := value.(*Connection)
+            v1.Close()
+            m.Delete(v1.GetRoom())
+            return true
+        })
+    }
+}
 //lock room
 func (w *Protocol)  registerRoom(room string) {
     w.rwm.Lock()
@@ -151,6 +182,9 @@ func (w *Protocol) registerWs(rw http.ResponseWriter, r *http.Request, room stri
     go wsConn.write()
 }
 
+func (w *Protocol) Send(msg IMessage) {
+    w.Msg <- msg
+}
 //send message with msg
 func (w *Protocol) send(msg IMessage) {
     all := w.All(msg.GetRoom())
@@ -217,6 +251,10 @@ func (w *Protocol) Run()  {
             w.send(msg)
         }
     }
+}
+
+func (w *Protocol) GetNumber() uint64 {
+    return w.num
 }
 
 func (w *Protocol) upErrorHandler(res http.ResponseWriter, req *http.Request, status int, reason error) {
