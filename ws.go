@@ -43,6 +43,7 @@ type Protocol struct {
 func (w *Protocol) ServeHTTP(rw http.ResponseWriter, r *http.Request)  {
 
     res := strings.Split(r.URL.Path, "/")
+
     l := len(res)
     if l < 2 {
         Response(rw, DefaultResponse{
