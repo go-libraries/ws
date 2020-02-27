@@ -1,56 +1,56 @@
 package ws
 
 import (
-    "encoding/json"
-    "net/http"
-    "strconv"
+	"encoding/json"
+	"net/http"
+	"strconv"
 )
 
 type DefaultResponse struct {
-    Code string `json:"code"`
-    Msg  string `json:"msg"`
-    Data interface{} `json:"data"`
+	Code string      `json:"code"`
+	Msg  string      `json:"msg"`
+	Data interface{} `json:"data"`
 }
 
 var (
-    newline = []byte{'\n'}
-    space   = []byte{' '}
+	newline = []byte{'\n'}
+	space   = []byte{' '}
 )
 
 func (res DefaultResponse) Error() string {
-    return res.Msg
+	return res.Msg
 }
 
-func (res DefaultResponse) ToJsonBytes() []byte  {
-    b,err := json.Marshal(res)
-    if err != nil {
-        return []byte{}
-    }
+func (res DefaultResponse) ToJsonBytes() []byte {
+	b, err := json.Marshal(res)
+	if err != nil {
+		return []byte{}
+	}
 
-    return b
+	return b
 }
 
 func (res DefaultResponse) GetData() interface{} {
-    return res.Data
+	return res.Data
 }
 
 func (res DefaultResponse) ToJsonString() string {
-     b := res.ToJsonBytes()
-     return string(b[:])
+	b := res.ToJsonBytes()
+	return string(b[:])
 }
 
 func (res DefaultResponse) GetCode() int {
-    code,err := strconv.Atoi(res.Code)
+	code, err := strconv.Atoi(res.Code)
 
-    if err != nil {
-        code = 200
-    }
+	if err != nil {
+		code = 200
+	}
 
-    return  code
+	return code
 }
 
 func Response(res http.ResponseWriter, response IResponse) {
-    code := response.GetCode()
-    res.WriteHeader(code)
-    res.Write(response.ToJsonBytes())
+	code := response.GetCode()
+	res.WriteHeader(code)
+	res.Write(response.ToJsonBytes())
 }
