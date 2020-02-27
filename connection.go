@@ -56,7 +56,7 @@ func (wsc *Connection) read() {
 		}
 
 		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
-		wsc.CLog.Println(fmt.Sprintf("receive message: %s", string(message[:])))
+		wsc.CLog.Println(fmt.Sprintf("receive message: %s from %s", string(message[:]), wsc.Conn.RemoteAddr().String()))
 
 		switch msgType {
 		case websocket.CloseMessage:

@@ -1,9 +1,9 @@
 package ws
 
 import (
+	"fmt"
 	"github.com/gorilla/websocket"
 	"net/http"
-	"strings"
 	"sync"
 )
 
@@ -40,58 +40,32 @@ type Protocol struct {
 //router http   /room/xxx/cancel
 //router http   /room/xxx/register
 func (w *Protocol) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
-
-	res := strings.Split(r.URL.Path, "/")
-
-	l := len(res)
-	if l < 2 {
-		Response(rw, DefaultResponse{
-			Code: "500",
-			Msg:  "protocol not support",
-		})
-		return
-	}
-
-	room := ""
-	if res[1] == "ws" {
-		if l == 2 {
-			room = res[2]
-		}
-		if !w.roomExists(room) {
-			Response(rw, DefaultResponse{
-				Code: "500",
-				Msg:  "room id not exists",
-			})
-			return
-		}
-		w.registerWs(rw, r, room)
-		Response(rw, SuccessResponse)
-		return
-	}
-
-	if res[1] == "room" {
-		room = res[2]
-		if room == "" {
-			Response(rw, DefaultResponse{
-				Code: "500",
-				Msg:  "room id not exists",
-			})
-			return
-		}
-		isRegister := true
-		if l > 3 {
-			v := res[3]
-			if v == "cancel" {
+	room := r.URL.Query().Get("room_id")
+	if room != "" {
+		if  r.URL.Path == "/room" {
+			isRegister := true
+			if r.URL.Query().Get("un_register") == "1" {
 				isRegister = false
 			}
+			if isRegister {
+				w.registerRoom(room)
+			} else {
+				w.unRegisterRoom(room)
+			}
+			Response(rw, SuccessResponse)
+			return
+		} else if r.URL.Path == "/ws" {
+			if !w.roomExists(room) {
+				Response(rw, DefaultResponse{
+					Code: "500",
+					Msg:  "room id not exists",
+				})
+				return
+			}
+			w.registerWs(rw, r, room)
+			Response(rw, SuccessResponse)
+			return
 		}
-		if isRegister {
-			w.registerRoom(room)
-		} else {
-			w.unRegisterRoom(room)
-		}
-		Response(rw, SuccessResponse)
-		return
 	}
 
 	Response(rw, DefaultResponse{
@@ -121,9 +95,12 @@ func (w *Protocol) registerRoom(room string) {
 	w.rwm.Lock()
 	defer w.rwm.Unlock()
 
-	if ok := w.roomExists(room); !ok {
+	ok := w.roomExists(room);
+	if !ok {
 		w.ConnectionsMap[room] = new(sync.Map)
 	}
+	fmt.Println(w.ConnectionsMap)
+
 }
 
 func (w *Protocol) roomExists(room string) bool {
@@ -140,8 +117,8 @@ func (w *Protocol) registerWs(rw http.ResponseWriter, r *http.Request, room stri
 	}
 
 	up := &websocket.Upgrader{
-		ReadBufferSize:  w.Config.GetReadBufferSize(),
-		WriteBufferSize: w.Config.GetWriteBufferSize(),
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
 	}
 
 	if w.UpErrorHandler != nil {
