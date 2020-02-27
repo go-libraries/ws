@@ -16,7 +16,7 @@ var ErrorResponse = DefaultResponse{
 
 func init() {
 	Wsp = &Protocol{
-
+		rwm : new(sync.RWMutex),
 	}
 	Wsp.ConnectionsMap = make(map[string]*sync.Map)
 
