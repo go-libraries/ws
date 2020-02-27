@@ -79,7 +79,7 @@ func (w *Protocol) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 			return
 		}
 		isRegister := true
-		if l > 2 {
+		if l > 3 {
 			v := res[3]
 			if v == "cancel" {
 				isRegister = false
